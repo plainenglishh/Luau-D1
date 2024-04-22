@@ -1,0 +1,12 @@
+authors = ["plainenglish"]
+description = ""
+entrypoint = "./lib/init.luau"
+exclude = ["docs"]
+licence = "MIT"
+name = "Luau-D1"
+repository = "https://github.com/plainenglishh/Luau-D1.git"
+version = "1.0.0"
+
+[dependencies]
+
+[scripts]
