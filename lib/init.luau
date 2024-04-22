@@ -1,97 +1,137 @@
-local NEW_TABLE_QUERY = [[
-CREATE TABLE %s (
+--!strict
+
+--[[
+    Luau-D1 - plainenglish
+
+    Copyright © 2024 plainenglish
+
+    Permission is hereby granted, free of charge, to any person obtaining a
+    copy of this software and associated documentation files (the “Software”),
+    to deal in the Software without restriction, including without limitation
+    the rights to use, copy, modify, merge, publish, distribute, sublicense,
+    and/or sell copies of the Software, and to permit persons to whom the
+    Software is furnished to do so, subject to the following conditions:
+
+    The above copyright notice and this permission notice shall be included in
+    all copies or substantial portions of the Software.
+
+    THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+    AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+    FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+    DEALINGS IN THE SOFTWARE.
+]]
+
+local NEW_TABLE_QUERY = [[CREATE TABLE %s (
     key TEXT PRIMARY KEY, 
     value TEXT,
     metadata TEXT 
 );
 
-CREATE UNIQUE INDEX idx_%s on %s (key)
-]];
-
-type HttpMethod = "GET" | "POST" | "PUT" | "DELETE" | "HEAD" | "OPTIONS" | "PATCH";
-
-type HttpQueryOrHeaderMap = { [string]: string | { string } };
-type HttpQueryMap = HttpQueryOrHeaderMap;
-type HttpHeaderMap = HttpQueryOrHeaderMap;
+CREATE UNIQUE INDEX idx_%s on %s (key)]];
 
 type FetchParams = {
 	url: string,
-	method: HttpMethod?,
+	method: "GET" | "POST" | "PUT" | "DELETE" | "HEAD" | "OPTIONS" | "PATCH"?,
 	body: (string | buffer)?,
-	query: HttpQueryMap?,
-	headers: HttpHeaderMap?,
+	query: { [string]: string | { string } }?,
+	headers: { [string]: string | { string } }?,
 };
 
 type FetchResponse = {
 	ok: boolean,
 	statusCode: number,
 	statusMessage: string,
-	headers: HttpHeaderMap,
+	headers: { [string]: string | { string } },
 	body: string?,
 };
 
-local context;
+local function determine_runtime(): "roblox"|"lune"
+    local runtime;
        
-if game and task then
-    context = "roblox";
-else
-    local ok, net = pcall(function()
-        return require("@lune/net");
-    end);
+    if game and task then
+        runtime = "roblox";
+    else
+        local ok, net = pcall(function()
+            return require("@lune/net");
+        end);
 
-    if ok and net then
-        context = "lune"
+        if ok and net then
+            runtime = "lune"
+        end
     end
+
+    assert(runtime, "Unable to determine context. Please specify in options.");
+
+    return runtime :: any;
 end
 
-assert(context, "Unable to determine context. Please specify in options.");
+--[[
+    Creates a limited, runtime dependent version of the lune net builtin.
+    Allows for portibility across lune & roblox codebases within a single module.
+]]
+local function create_net()
+    local runtime = determine_runtime();
 
-local net = {};
+    local net = {};
 
-if context == "roblox" then
-    local http_service = game:GetService("HttpService");
-    function net.request(config: string | FetchParams): FetchResponse
-        local options: FetchParams;
-        if typeof(config) == "string" then
-            options = { url = config };
-        else
-            options = config;
+    if runtime == "roblox" then
+        local http_service = game:GetService("HttpService");
+        function net.request(config: string | FetchParams): FetchResponse
+            local options: FetchParams;
+            if typeof(config) == "string" then
+                options = { url = config };
+            else
+                options = config;
+            end
+
+            local res = http_service:RequestAsync({
+                Url = options.url,
+                Method = options.method or "GET",
+                Headers = options.headers :: any,
+                Body = options.body
+            });
+
+            return {
+                statusCode = res.StatusCode,
+                statusMessage = res.StatusMessage,
+                body = res.Body,
+                headers = res.Headers,
+                ok = res.Success
+            };
         end
 
-        local res = http_service:RequestAsync({
-            Url = options.url,
-            Method = options.method or "GET",
-            Headers = options.headers :: any,
-            Body = options.body
-        });
+        function net.jsonEncode(value: any): string
+            return http_service:JSONEncode(value);
+        end
 
-        return {
-            statusCode = res.StatusCode,
-            statusMessage = res.StatusMessage,
-            body = res.Body,
-            headers = res.Headers,
-            ok = res.Success
-        };
+        function net.jsonDecode(encoded: string): any
+            return http_service:JSONDecode(encoded);
+        end
+    elseif runtime == "lune" then
+        local lune_net = require("@lune/net");
+        net.request = lune_net.request :: any;
+        net.jsonEncode = lune_net.jsonEncode :: any;
+        net.jsonDecode = lune_net.jsonDecode :: any;
     end
 
-    function net.jsonEncode(value: any): string
-        return http_service:JSONEncode(value);
-    end
-
-    function net.jsonDecode(encoded: string): any
-        return http_service:JSONDecode(encoded);
-    end
-elseif context == "lune" then
-    local lune_net = require("@lune/net");
-    net.request = lune_net.request :: any;
-    net.jsonEncode = lune_net.jsonEncode :: any;
-    net.jsonDecode = lune_net.jsonDecode :: any;
+    return net;
 end
 
+local net = create_net();
+
+--[[
+    Serialises data for storage.
+]]
 local function ser(val: any): any
     return net.jsonEncode(val);
 end
 
+--[[
+    Deserialises data back into Lua types.
+]]
 local function deser(val: any): any
     if not val then
         return val;
@@ -109,8 +149,11 @@ local function create_metadata(create_t: number, update_t: number, userids: {num
     });
 end
 
-local DataStoreKeyInfo = {};
-do
+
+--[[
+    Class used to store information about a key.
+]]
+local DataStoreKeyInfo = {}; do
     DataStoreKeyInfo.__index = DataStoreKeyInfo;
 
     function DataStoreKeyInfo.new(created_time: number, updated_time: number, version: string, metadata: {[any]: any})
@@ -134,11 +177,13 @@ do
     end
 end
 
-local DataStore = {};
-do
+--[[
+    Class used to wrap a D1 Database table.
+]]
+local DataStore = {}; do
     DataStore.__index = DataStore;
     
-    -- FIXME: SQL INJECTION POSSIBILITY. MAKE KNOWN IN DOCUMENTATION. --
+    -- SQL INJECTION POSSIBILITY. MAKE KNOWN IN DOCUMENTATION. --
     function DataStore.new(wrapper: any, name: string, create_if_non_existant: boolean?)
         if create_if_non_existant then
             local res = wrapper:query("SELECT * FROM sqlite_master where type == \"table\" and name = ?", {name});
@@ -164,7 +209,7 @@ do
         local value = deser(data.result[1].results[1] and data.result[1].results[1].value);
         local key_info = DataStoreKeyInfo.new(1, 1, "", {});
 
-        return value, key_info;
+        return value, key_info :: any;
     end
     
     function DataStore:set_async(key: string, value: any)
@@ -196,12 +241,15 @@ do
     end
 
     function DataStore:increment_async(key: string, delta: number)
-        return self:update_async(key, function(old)
+        return self:update_async(key, function(old: number)
+            assert(typeof(old) == "number", "Value must be of type number.");
+
             old += delta;
             return old;
         end);
     end
     
+    -- Roblox Compatibility --
     DataStore.GetAsync = DataStore.get_async;
     DataStore.SetAsync = DataStore.set_async;
     DataStore.UpdateAsync = DataStore.update_async;
@@ -209,46 +257,51 @@ do
     DataStore.IncrementAsync = DataStore.increment_async;
 end
 
-local auth_map = {};
+--[[
+    Wrapper for a D1 Database.
+]]
+local D1Wrapper = {}; do
+    local auth_map = {};
 
-type D1WrapperOptions = {
-    account_id: string,
-    database_id: string,
-    auth: string | Secret 
-};
+    type D1WrapperOptions = {
+        account_id: string,
+        database_id: string,
+        auth: string | Secret 
+    };
+    
+    D1Wrapper.__index = D1Wrapper;
 
-local D1Wrapper = {};
-D1Wrapper.__index = D1Wrapper;
+    function D1Wrapper.new(options: D1WrapperOptions)
+        local self = setmetatable({}, D1Wrapper);
 
-function D1Wrapper.new(options: D1WrapperOptions)
-    local self = setmetatable({}, D1Wrapper);
+        self.url = `https://api.cloudflare.com/client/v4/accounts/{options.account_id}/d1/database/{options.database_id}/query`;
+        auth_map[self] = options.auth;
 
-    self.url = `https://api.cloudflare.com/client/v4/accounts/{options.account_id}/d1/database/{options.database_id}/query`;
-    auth_map[self] = options.auth;
+        return self;
+    end
 
-    return self;
-end
+    function D1Wrapper:get_data_store(name: string)
+        return DataStore.new(self, name, true);
+    end
 
-function D1Wrapper:get_data_store(name: string)
-    return DataStore.new(self, name, true);
-end
+    -- Roblox Compatibility --
+    D1Wrapper.GetDataStore = D1Wrapper.get_data_store;
 
-D1Wrapper.GetDataStore = D1Wrapper.get_data_store;
+    function D1Wrapper:query(sql: string, params: {string}?)
+        local res = net.request({
+            url = self.url,
+            headers = {
+                authorization = auth_map[self] :: string,
+            },
+            method = "POST",
+            body = net.jsonEncode({
+                sql = sql,
+                params = params,
+            }),
+        });
 
-function D1Wrapper:query(sql: string, params: {string}?)
-    local res = net.request({
-        url = self.url,
-        headers = {
-            authorization = auth_map[self] :: string,
-        },
-        method = "POST",
-        body = net.jsonEncode({
-            sql = sql,
-            params = params,
-        }),
-    });
-
-    return res;
+        return res;
+    end
 end
 
 return D1Wrapper;
