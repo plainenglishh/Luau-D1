@@ -180,19 +180,21 @@ end
 --[[
     Class used to wrap a D1 Database table.
 ]]
-local DataStore = {}; do
-    DataStore.__index = DataStore;
+local D1DataStore = {}; do
+    D1DataStore.__index = D1DataStore;
     
     -- SQL INJECTION POSSIBILITY. MAKE KNOWN IN DOCUMENTATION. --
-    function DataStore.new(wrapper: any, name: string, create_if_non_existant: boolean?)
+    function D1DataStore.new(wrapper: any, name: string, create_if_non_existant: boolean?)
+        local safe_name = name:gsub("[^%w_-]", "");
+        
         if create_if_non_existant then
             local res = wrapper:query("SELECT * FROM sqlite_master where type == \"table\" and name = ?", {name});
             if res.ok and #net.jsonDecode(res.body).result[1].results == 0 then
-                wrapper:query(NEW_TABLE_QUERY:format(name, name, name));
+                wrapper:query(NEW_TABLE_QUERY:format(safe_name, safe_name, safe_name));
             end
         end
     
-        local self = setmetatable({}, DataStore);
+        local self = setmetatable({}, D1DataStore);
     
         self.name = name;
         self.wrapper = wrapper;
@@ -200,7 +202,7 @@ local DataStore = {}; do
         return self;
     end
     
-    function DataStore:get_async(key: string): (any, DataStoreKeyInfo)
+    function D1DataStore:get_async(key: string): (any, DataStoreKeyInfo)
         local res = self.wrapper:query(`SELECT * FROM {self.name} WHERE key = ?`, {key});
         assert(res.ok, res.statusMessage);
     
@@ -212,7 +214,7 @@ local DataStore = {}; do
         return value, key_info :: any;
     end
     
-    function DataStore:set_async(key: string, value: any)
+    function D1DataStore:set_async(key: string, value: any)
         if self:get_async(key) then
             local res = self.wrapper:query(`UPDATE {self.name} SET value = ? WHERE key = ?`, {ser(value), key});
             assert(res.ok, res.statusMessage);
@@ -222,7 +224,7 @@ local DataStore = {}; do
         end
     end
     
-    function DataStore:update_async(key: string, update_func: (any)->(any))
+    function D1DataStore:update_async(key: string, update_func: (old: any)->(any))
         local old_value = self:get_async(key);
         local value = update_func(old_value);
         
@@ -235,12 +237,12 @@ local DataStore = {}; do
         end
     end
     
-    function DataStore:remove_async(key: string)
+    function D1DataStore:remove_async(key: string)
         local res = self.wrapper:query(`DELETE FROM {self.name} WHERE key = ?`, {key});
         assert(res.ok, res.statusMessage);
     end
 
-    function DataStore:increment_async(key: string, delta: number)
+    function D1DataStore:increment_async(key: string, delta: number)
         return self:update_async(key, function(old: number)
             assert(typeof(old) == "number", "Value must be of type number.");
 
@@ -250,17 +252,17 @@ local DataStore = {}; do
     end
     
     -- Roblox Compatibility --
-    DataStore.GetAsync = DataStore.get_async;
-    DataStore.SetAsync = DataStore.set_async;
-    DataStore.UpdateAsync = DataStore.update_async;
-    DataStore.RemoveAsync = DataStore.remove_async;
-    DataStore.IncrementAsync = DataStore.increment_async;
+    D1DataStore.GetAsync = D1DataStore.get_async;
+    D1DataStore.SetAsync = D1DataStore.set_async;
+    D1DataStore.UpdateAsync = D1DataStore.update_async;
+    D1DataStore.RemoveAsync = D1DataStore.remove_async;
+    D1DataStore.IncrementAsync = D1DataStore.increment_async;
 end
 
 --[[
     Wrapper for a D1 Database.
 ]]
-local D1Wrapper = {}; do
+local D1 = {}; do
     local auth_map = {};
 
     type D1WrapperOptions = {
@@ -269,10 +271,10 @@ local D1Wrapper = {}; do
         auth: string | Secret 
     };
     
-    D1Wrapper.__index = D1Wrapper;
+    D1.__index = D1;
 
-    function D1Wrapper.new(options: D1WrapperOptions)
-        local self = setmetatable({}, D1Wrapper);
+    function D1.new(options: D1WrapperOptions)
+        local self = setmetatable({}, D1);
 
         self.url = `https://api.cloudflare.com/client/v4/accounts/{options.account_id}/d1/database/{options.database_id}/query`;
         auth_map[self] = options.auth;
@@ -280,14 +282,14 @@ local D1Wrapper = {}; do
         return self;
     end
 
-    function D1Wrapper:get_data_store(name: string)
-        return DataStore.new(self, name, true);
+    function D1:get_data_store(name: string)
+        return D1DataStore.new(self, name:gsub("[^%w_-]", ""), true);
     end
 
     -- Roblox Compatibility --
-    D1Wrapper.GetDataStore = D1Wrapper.get_data_store;
+    D1.GetDataStore = D1.get_data_store;
 
-    function D1Wrapper:query(sql: string, params: {string}?)
+    function D1:query(sql: string, params: {string}?)
         local res = net.request({
             url = self.url,
             headers = {
@@ -304,4 +306,4 @@ local D1Wrapper = {}; do
     end
 end
 
-return D1Wrapper;
+return D1;

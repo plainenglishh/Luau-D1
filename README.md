@@ -14,9 +14,6 @@ See also: [API Reference](./API-REFERENCE.md)
 
 Luau-D1 is a Luau library to serve as a Roblox DataStore-style wrapper around a Cloudflare D1 SQL Database.
 
-> [!WARNING]
-> Do not accept (or at least heavily sanetise) user input for the `name` parameter of D1.GetDataStore. Failing to do so may open up a potential SQL Injection pathway.
-
 ## Installation
 
 ### LPM (Recommended)
