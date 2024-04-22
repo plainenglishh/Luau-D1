@@ -32,13 +32,13 @@ Copy and paste `./lib/init.luau` into your project.
 
 ### Runtimes
 
-Luau-D1 will attempt to determine the runtime is is running within.
+Luau-D1 will attempt to determine the runtime it is running within.
 
 #### Supported Runtimes
 
 |Runtime|Check Method|
 |---|---|
-|Roblox|Checks whether `game` and `task` are present globals.|
+|Roblox|Checks whether `game` and `task` globals are present.|
 |Lune|Checks whether the `@lune/net` builtin is present.|
 
 ### Example Code
