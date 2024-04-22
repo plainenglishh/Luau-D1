@@ -8,5 +8,6 @@ repository = "https://github.com/plainenglishh/Luau-D1.git"
 version = "1.0.0"
 
 [dependencies]
+"Spearhead-Industries/extra-types" = "Spearhead-Industries/extra-types"
 
 [scripts]
