@@ -44,9 +44,9 @@ Luau-D1 will attempt to determine the runtime it is running within.
 ### Example Code
 
 ```lua
-local D1 = require("@lpm/luau-d1"); -- or require(script.luau_d1), if using in roblox.
+local luau_d1 = require("@lpm/luau-d1"); -- or require(script.luau_d1), if using in roblox.
 
-local D1DataStoreService = D1.new({
+local D1DataStoreService = luau_d1.D1.new({
     auth = "Bearer <key>",
     account_id = "3473547545488",
     database_id = "sdgsdfgdfdf"
