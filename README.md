@@ -71,7 +71,11 @@ test_datastore:RemoveAsync("test_key");
 print(test_datastore:GetAsync("test_key")); --> nil
 ```
 
-# Notes
+## Notes
 
 1. Using GetDataStore will automatically create the table if it doesn't exist.
 2. snake_case versions of all class methods are also available. (i.e DataStore:GetAsync = DataStore:get_async)
+
+## Contributions
+
+All contributions are accepted, simply submit a pull request. Please aim to keep the module within a single file.
