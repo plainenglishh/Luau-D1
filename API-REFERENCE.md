@@ -12,14 +12,40 @@
 
 # Types
 
-## `D1WrapperOptions`
-> D1WrapperOptions is used in the creation of D1 class.
+### `D1WrapperOptions`
+> The D1WrapperOptions type is used in the creation of D1 class.
 >
 > ```lua
 > type D1WrapperOptions = {
 >     account_id: string,
 >     database_id: string,
 >     auth: string | Secret 
+> };
+> ```
+
+### `QueryResult`
+> The QueryResult type represents a response from the CF D1 Query API.
+>
+> ```lua
+> {
+>     errors: {},
+>     messages: {},
+>     success: boolean,
+>     result: {
+>         {
+>             meta: {
+>                 changed_db: boolean,
+>                 changes: number,
+>                 duration: number,
+>                 last_row_id: number,
+>                 rows_read: number,
+>                 rows_written: number,
+>                 size_after: number,
+>             },
+>             results: { {[string]: any} },
+>             success: boolean,
+>         }
+>     }
 > };
 > ```
 

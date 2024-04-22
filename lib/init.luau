@@ -31,6 +31,32 @@ local NEW_TABLE_QUERY = [[CREATE TABLE %s (
 );
 
 CREATE UNIQUE INDEX idx_%s on %s (key)]];
+export type QueryResult = {
+    errors: {},
+    messages: {},
+    success: boolean,
+    result: {
+        {
+            meta: {
+                changed_db: boolean,
+                changes: number,
+                duration: number,
+                last_row_id: number,
+                rows_read: number,
+                rows_written: number,
+                size_after: number,
+            },
+            results: { {[string]: any} },
+            success: boolean,
+        }
+    }
+};
+
+export type D1WrapperOptions = {
+    account_id: string,
+    database_id: string,
+    auth: string | Secret 
+};
 
 type FetchParams = {
 	url: string,
@@ -264,12 +290,6 @@ end
 ]]
 local D1 = {}; do
     local auth_map = {};
-
-    type D1WrapperOptions = {
-        account_id: string,
-        database_id: string,
-        auth: string | Secret 
-    };
     
     D1.__index = D1;
 
@@ -289,7 +309,7 @@ local D1 = {}; do
     -- Roblox Compatibility --
     D1.GetDataStore = D1.get_data_store;
 
-    function D1:query(sql: string, params: {string}?)
+    function D1:query(sql: string, params: {string}?): QueryResult
         local res = net.request({
             url = self.url,
             headers = {
@@ -302,7 +322,7 @@ local D1 = {}; do
             }),
         });
 
-        return res;
+        return res :: any;
     end
 end
 
