@@ -16,7 +16,7 @@
 > The D1WrapperOptions type is used in the creation of D1 class.
 >
 > ```lua
-> type D1WrapperOptions = {
+> {
 >     account_id: string,
 >     database_id: string,
 >     auth: string | Secret 
